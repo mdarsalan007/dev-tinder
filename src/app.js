@@ -5,9 +5,13 @@ const connectDB = require("./config/database");
 const User = require("./models/user");
 const { validateSignUpData } = require("./utils/validation");
 const bcrypt = require("bcrypt");
+const cookieparser = require("cookie-parser")
+const jwt = require("jsonwebtoken");
+const {userAuth} = require("./middlewares/auth")
 
 // below should work for all the routes automatically.
 app.use(express.json());
+app.use(cookieparser());
 
 app.post("/signup", async (req, res) => {
   // dynamic to recieve data from end user (here postman)
@@ -39,16 +43,45 @@ app.post("/login", async (req, res) => {
     if (!user) {
       throw new Error("Invalid credentials");
     }
-    const isValidPassword = await bcrypt.compare(password, user.password);
+    const isValidPassword = await user.validatePassword(password);
     if (!isValidPassword) {
       throw new Error("Invalid credentials");
     } else {
+
+      const token = await user.getJWT();
+      console.log("Token generated:", token);
+      console.log("Type of token:", typeof token);
+
+      
+
+      res.cookie("token",token,{maxAge:3600000*24*7})
       res.send("successfully loged-in");
     }
   } catch (err) {
     res.status(400).send("ERROR: " + err.message);
   }
 });
+
+
+app.get("/profile", userAuth, async(req,res)=>{
+
+  try{
+    const user = req.user;
+    res.send(user);
+  }
+  catch(err){
+    res.status(400).send("ERROR: "+err.message)
+  }
+})
+
+app.post("/sendConnectionRequest" ,userAuth,async (req,res)=>{
+
+  const user = req.user;
+  console.log("Sending connection request");
+
+  res.send(user.firstName+" sent the connection request!");
+  
+})
 
 app.get("/feed", async (req, res) => {
   try {
